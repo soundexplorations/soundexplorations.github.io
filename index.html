@@ -1,0 +1,265 @@
+<head>
+    <style>
+        body {
+            touch-action: none;
+            text-align: center;
+            width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+            top: 50%;
+            position: fixed;
+            transform: translateY(-50%);
+        }
+        .wrapper {
+            width: 100vw;
+            height: 56.25vw;
+            position: relative;
+        }
+        .wrapper canvas {
+            margin: 0;
+            border: 1px solid black;
+            -webkit-touch-callout:none;
+            -webkit-user-select:none;
+            -khtml-user-select:none;
+            -moz-user-select:none;
+            -ms-user-select:none;
+            user-select:none;
+            -webkit-tap-highlight-color:rgba(0,0,0,0);
+            top: 50%;
+            left: 50%;
+            max-width: 80vw;
+            max-height: 70vh;
+            -ms-transform: translate(-50%, -50%);
+            transform: translate(-50%, -50%);
+            position: absolute;
+        }
+        .loader {
+            left:0;
+            right:0;
+            top: 40.6%;
+            margin:0 auto;
+            border: 16px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 1vw solid blue;
+            border-right: 1vw solid green;
+            border-bottom: 1vw solid red;
+            border-left: 1vw solid pink;
+            width: 10vw;
+            aspect-ratio: 1;
+            -webkit-animation: spin 2s linear infinite;
+            animation: spin 2s linear infinite;
+            position: absolute;
+        }
+        @-webkit-keyframes spin {
+            0% { -webkit-transform: rotate(0deg); }
+            100% { -webkit-transform: rotate(360deg); }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .loadtext {
+            font-size: 4vw;
+            position: absolute;
+            font-family: 'Fresca';
+            left: 0;
+            right: 0;
+            top: 22%;
+        }
+        @font-face {
+            font-family: 'Fresca';
+            src: url('fonts/Fresca-Regular.ttf');
+        }
+    </style>
+
+    <script src="lowLag.js"></script>
+    <script src="sm2/js/soundmanager2.js"></script>
+    <script src="//code.jquery.com/jquery-1.8.0.min.js"></script>
+    <script type="module">
+        import {MusicStudio} from './MusicStudio.js';
+        import {StartScreen} from './Start.js';
+        import {images, sounds} from './assets.js';
+
+        let canvas = document.getElementById('musicstudio');
+        let game;
+        let start;
+        let rect;
+        let scaleX;
+        let scaleY;
+        
+        var soundCount = Object.keys(sounds).length;
+        function loadAssets() {
+            loadSounds();
+            loadImages();
+        }
+
+        function loadSounds() {
+            // Load each sound using lowLag
+            lowLag.init();
+            for (const [key, value] of Object.entries(sounds)) {
+                lowLag.load(value, key);
+            }
+        }
+
+        function loadImages() {
+            // Wait until sounds are loaded
+            if (soundCount > soundLoadCount) {
+                setTimeout(loadImages, 100);
+            }
+            else {
+                // Convert image filepath -> image instance
+                for (const [key, value] of Object.entries(images)) {
+                    const image = new Image();
+                    image.src = value;
+                    images[key] = image;
+                }
+                // Load each image
+                var imageCount = Object.keys(images).length;
+                var imagesLoaded = 0;
+                for (const [key, value] of Object.entries(images)) {
+                    // Only proceed if all images are loaded
+                    images[key].onload = function() {
+                        imagesLoaded++;
+                        if (imagesLoaded == imageCount) {
+                            const loader = document.getElementById('load');
+                            loader.remove();
+                            init();
+                        }
+                    }
+                }
+            }
+        }
+
+        function init() {
+            rect = canvas.getBoundingClientRect();
+            scaleX = canvas.width / rect.width;
+            scaleY = canvas.height / rect.height;
+
+            // Input events
+            canvas.addEventListener("touchstart", handleStart);
+            canvas.addEventListener("touchend", handleEnd);
+            canvas.addEventListener("touchmove", handleMove);
+            canvas.addEventListener("mousedown", handleMouseDown);
+            canvas.addEventListener("mouseup", handleMouseUp);
+            canvas.addEventListener("mousemove", handleMouseMove);
+            canvas.addEventListener("mouseleave", handleMouseLeave);
+
+            start = new StartScreen(canvas, keyMap, touchMap);
+            setInterval(update, 0);
+        }
+        
+        function update() {
+            start.mainLoop();
+        }
+        
+        window.onload = loadAssets;
+        
+        
+        function handleKeyPress(e) {
+            keyMap[e.key] = !e.repeat;
+
+        }
+        
+        function handleKeyUp(e) {
+            keyMap[e.key] = false;
+        }
+        
+        var firstTouch;
+        var isMouse = false;
+        const keyMap = {};
+        window.onkeydown = handleKeyPress;
+        window.onkeyup = handleKeyUp;
+
+        const touchMap = {
+            pos: [-1000, -1000],
+            initialTouch: false,
+        };
+
+        function handleStart(e) {
+            e.preventDefault();
+            if (firstTouch === undefined) {
+            firstTouch = e.changedTouches[0].identifier;
+            }
+            
+            touchMap.initialTouch = true;
+            touchMap.press = true;
+            touchMap.release = false;
+            touchMap.pos = [(e.touches[0].clientX - rect.left) * scaleX, (e.touches[0].clientY - rect.top) * scaleY];
+        
+        }
+
+        function handleEnd(e) {
+            e.preventDefault();
+            if (inTouchList(e.changedTouches, firstTouch)) {
+                touchMap.initialTouch = false;
+                touchMap.press = false;
+                touchMap.release = true;
+                touchMap.touchedObject = undefined;
+                firstTouch = undefined;
+            }
+            
+        }
+
+        function handleMove(e) {
+            e.preventDefault();
+            touchMap.initialTouch = false;
+            touchMap.release = false;
+            touchMap.pos = [(e.touches[0].clientX - rect.left) * scaleX, (e.touches[0].clientY - rect.top) * scaleY];
+        }
+
+        function inTouchList(list, element) {
+            for (let i=0; i<list.length; i++) {
+                if (element === list[i].identifier) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function handleMouseDown(e) {
+            touchMap.initialTouch = true;
+            touchMap.press = true;
+            touchMap.release = false;
+            touchMap.pos = [(e.pageX - rect.left) * scaleX, (e.pageY - rect.top) * scaleY];
+        }
+
+        function handleMouseUp(e) {
+            touchMap.initialTouch = false;
+            touchMap.press = false;
+            touchMap.release = true;
+            touchMap.touchedObject = undefined;
+        }
+
+        function handleMouseMove(e) {
+            touchMap.initialTouch = false;
+            touchMap.release = false;
+            touchMap.pos = [(e.pageX - rect.left) * scaleX, (e.pageY - rect.top) * scaleY];
+        }
+
+        function handleMouseLeave(e) {
+            touchMap.initialTouch = false;
+            touchMap.press = false;
+            touchMap.touchedObject = undefined;
+        }
+
+        window.addEventListener("resize", handleResize);
+        window.addEventListener("orientationchange", handleResize);
+
+        function handleResize() {
+            rect = canvas.getBoundingClientRect();
+            scaleX = canvas.width / rect.width;
+            scaleY = canvas.height / rect.height;
+        }
+    </script>
+</head>
+
+<body>
+    <div id='wrap' class="wrapper">
+        <div id="load">
+            <p class="loadtext">Loading...</p>
+            <div class="loader"></div>
+        </div>
+        <canvas id="musicstudio" width="1280" height="720"></canvas>
+</div>
+</body>
