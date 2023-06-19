@@ -91,9 +91,6 @@ export class StartScreen {
                     this.game = undefined;
                 }
             }
-
-            var sinceStart = this.now - this.startTime;
-            var currentFps = Math.round(1000 / (sinceStart / ++this.frameCount) * 100) / 100;
         }   
     }
 
