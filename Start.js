@@ -18,6 +18,7 @@ export class StartScreen {
 
         this.initializeButtons();
         this.initializeBackground();
+        this.initializeFPS();
         this.started = false;
         this.game;
     }
@@ -57,21 +58,43 @@ export class StartScreen {
         this.background.height = this.canvas.height;
     }
 
+    initializeFPS() {
+        this.frameCount = 0;
+        this.fps = 60;
+        this.now;
+        this.elapsed;
+
+        this.fpsInterval = 1000 / this.fps;
+        this.then = Date.now();
+        this.startTime = this.then;
+    }
+
     mainLoop() {
-        // Render start screen prior to any button press
-        if (!this.started) {
-            this.update();
-            this.draw();
-        }
-        else {
-            // Once a button is pressed, render the game
-            this.game.mainLoop();
-            if (this.game.backButton.flag) {
-                this.started = false;
-                this.game.resetGame();
-                this.game = undefined;
+        requestAnimationFrame(() => this.mainLoop());
+
+        this.now = Date.now();
+        this.elapsed = this.now - this.then;
+
+        if (this.elapsed > this.fpsInterval) {
+            this.then = this.now - (this.elapsed % this.fpsInterval);
+            // Render start screen prior to any button press
+            if (!this.started) {
+                this.update();
+                this.draw();
             }
-        }
+            else {
+                // Once a button is pressed, render the game
+                this.game.mainLoop();
+                if (this.game.backButton.flag) {
+                    this.started = false;
+                    this.game.resetGame();
+                    this.game = undefined;
+                }
+            }
+
+            var sinceStart = this.now - this.startTime;
+            var currentFps = Math.round(1000 / (sinceStart / ++this.frameCount) * 100) / 100;
+        }   
     }
 
     update() {
