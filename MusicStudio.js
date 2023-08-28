@@ -24,6 +24,7 @@ export class MusicStudio {
         this.rowOffset = Y_SCALE * rowOffset;
         this.measureSize = measureSize;
         this.bpm = bpm;
+        this.saving = false;
 
         // Initialize game objects
         this.initializeSlots();
@@ -140,6 +141,16 @@ export class MusicStudio {
         const clearY = playY;
         this.clearButton = new Button(clearX, clearY, buttonWidth, buttonHeight, this.buttonCanvas, this.buttonCtx, this.touchMap, images['clear']);
     
+        // Save Button
+        const saveX = this.canvas.width - this.colOffset - buttonWidth;
+        const saveY = playY;
+        this.saveButton = new Button(saveX, saveY, buttonWidth, buttonHeight, this.buttonCanvas, this.buttonCtx, this.touchMap, images['save']);
+
+        // Download Button
+        const downloadX = this.canvas.width/2 - buttonWidth/2;
+        const downloadY = playY;
+        this.downloadButton = new Button(downloadX, downloadY, buttonWidth, buttonHeight, this.buttonCanvas, this.buttonCtx, this.touchMap, images['download']);
+
         // Back Button
         const backX = this.colOffset;
         const backY = playY;
@@ -174,12 +185,14 @@ export class MusicStudio {
         this.playButton.update();
         this.restartButton.update();
         this.clearButton.update();
+        this.saveButton.update();
+        this.downloadButton.update();
         this.backButton.update();
 
         // Can interact again once player is finished/reset
         if (this.playLine.minX == this.playLine.initialX) {
             this.toggleGameObjects(this.notes, true);
-            this.toggleGameObjects([this.clearButton], true);
+            this.toggleGameObjects([this.clearButton, this.saveButton], true);
         }
 
         // Set up audio sequence when play button is pressed
@@ -188,7 +201,7 @@ export class MusicStudio {
                 this.parseSlotData();
                 // Disable interaction while player is enabled
                 this.toggleGameObjects(this.notes, false);
-                this.toggleGameObjects([this.clearButton], false);
+                this.toggleGameObjects([this.clearButton, this.saveButton], false);
             }
             this.playLine.paused = false;
             this.playButton.flag = false;
@@ -204,12 +217,38 @@ export class MusicStudio {
             this.restart();
         }
 
-        // Clear the notes from the grid
-        if (this.clearButton.flag && this.playLine.minX == this.playLine.initialX) {
-            for (const note of this.notes) {
-                note.reset();
+        if (this.downloadButton.flag) {
+            this.save();
+            this.downloadButton.flag = false;
+        }
+
+        if (this.playLine.minX == this.playLine.initialX) {
+            // Clear the notes from the grid
+            if (this.clearButton.flag) {
+                for (const note of this.notes) {
+                    note.reset();
+                }
+                this.clearButton.flag = false;
             }
-            this.clearButton.flag = false;
+            // Enter saving mode
+            if (this.saveButton.flag) {
+                this.toggleGameObjects([this.downloadButton], true);
+                const input = this.promptName();
+                if (input != null) {
+                    this.saving = true;
+                    this.saveButton.changeImage(images['rename']);
+                    this.toggleGameObjects([this.playButton, this.restartButton, this.clearButton], false);
+                }
+                this.saveButton.flag = false;
+            }
+        }
+
+        if (this.backButton.flag && this.saving) {
+            this.saving = false;
+            this.saveButton.changeImage(images['save']);
+            this.toggleGameObjects([this.downloadButton], false);
+            this.toggleGameObjects([this.playButton, this.restartButton, this.clearButton], true);
+            this.backButton.flag = false;
         }
 
         this.playLine.update(Date.now());
@@ -237,20 +276,44 @@ export class MusicStudio {
             this.ctx.fillText(PITCH_SEQUENCE[i].charAt(0), this.colOffset/2, this.alignOffset + this.rowOffset + this.slotHeight/2 + ((PITCH_SEQUENCE.length-1)-i)*this.slotHeight);
         }
 
-        // Note Blocks
-        let frontNote;
-        for (const note of this.notes) {
-            if (this.touchMap.touchedObject === note) {
-                frontNote = note;
-                continue;
+        if (this.saving) {
+            this.ctx.font = (this.slotHeight + 10).toString() + 'px Fresca';
+            this.ctx.fillText(this.melodyName, this.canvas.width/2, this.canvas.height - this.rowOffset/2);
+
+            for (const note of this.notes) {
+                if (note.slotted) {
+                    note.draw();
+                }
             }
-            note.draw();
+
+            this.downloadButton.draw();
+        }
+        else {
+            // Note Blocks
+            let frontNote;
+            for (const note of this.notes) {
+                if (this.touchMap.touchedObject === note) {
+                    frontNote = note;
+                    continue;
+                }
+                note.draw();
+            }
+
+            // Buttons
+            this.playButton.draw();
+            this.restartButton.draw();
+            this.clearButton.draw();
+
+            // Play Line
+            this.playLine.draw();
+
+            // Dragged Note Block
+            if (frontNote != undefined) {
+            frontNote.draw();
+            }
         }
 
-        // Buttons
-        this.playButton.draw();
-        this.restartButton.draw();
-        this.clearButton.draw();
+        this.saveButton.draw();
         this.backButton.draw();
 
         // Top Horizontal Line
@@ -298,14 +361,6 @@ export class MusicStudio {
             this.ctx.stroke();
             this.ctx.lineWidth = 1;
         }
-
-        // Play Line
-        this.playLine.draw();
-
-        // Dragged Note Block
-        if (frontNote != undefined) {
-            frontNote.draw();
-        }
     }
 
     parseSlotData() {
@@ -345,6 +400,19 @@ export class MusicStudio {
         for (const note of this.noteSequence) {
             lowLag.stop(note.sound);
         }
+    }
+
+    save() {
+        var link = document.getElementById('link');
+        link.setAttribute('download', this.melodyName + '.png');
+        link.setAttribute('href', this.canvas.toDataURL('image/png').replace('image/png', 'image/octet-stream'));
+        link.click();
+    }
+
+    promptName() {
+        let input = prompt('Enter your melody name:', 'My Melody');
+        this.melodyName = (input != null) ? input : this.melodyName;
+        return input;
     }
 
     toggleGameObjects(objects, toggle) {
@@ -704,6 +772,13 @@ export class Button {
         this.alpha = 1;
         this.clicked = false;
         this.flag = false;
+        this.useTransparent = false;
+    }
+
+    changeImage(image) {
+        this.image = image;
+        this.image.width = this.width;
+        this.image.height = this.height;
     }
 
     update() {
@@ -717,7 +792,10 @@ export class Button {
             }
     
             // When button is clicked on
-            if (this.touchMap.touchedObject === this && this.touchMap.press && this.ctx.getImageData(this.touchMap.pos[0], this.touchMap.pos[1], 1, 1).data[3] > 0 && intersectBox(this.touchMap.pos[0], this.touchMap.pos[1], this.minX, this.minY, this.image.width, this.image.height)) {
+            if (this.touchMap.touchedObject === this 
+                && this.touchMap.press 
+                && (this.ctx.getImageData(this.touchMap.pos[0], this.touchMap.pos[1], 1, 1).data[3] > 0 || this.useTransparent) 
+                && intersectBox(this.touchMap.pos[0], this.touchMap.pos[1], this.minX, this.minY, this.image.width, this.image.height)) {
                 this.alpha = 0.75;
                 this.clicked = true;
             }

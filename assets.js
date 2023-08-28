@@ -16,6 +16,9 @@ export const images = {
     'back': 'images/Back.png',
     '3/4': 'images/34.png',
     '4/4': 'images/44.png',
+    'save': 'images/save.png',
+    'rename': 'images/rename.png',
+    'download': 'images/download.png'
 };
 
 // Sound Assets (key, filepath)

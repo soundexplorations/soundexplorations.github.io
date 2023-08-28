@@ -43,13 +43,15 @@ export class StartScreen {
 
         // First Button (Launch first game instance)
         const firstOptionX = paddingX;
-        const firstOptionY = 300 * Y_SCALE;
+        const firstOptionY = 425 * Y_SCALE;
         this.firstOptionButton = new Button(firstOptionX, firstOptionY, buttonWidth, buttonHeight, this.buttonCanvas, this.buttonCtx, this.touchMap, images['4/4']);
+        this.firstOptionButton.useTransparent = true;
         
         // Second Button (Launch second game instance)
         const secondOptionX = firstOptionX + buttonWidth + spacing;
         const secondOptionY = firstOptionY;
         this.secondOptionButton = new Button(secondOptionX, secondOptionY, buttonWidth, buttonHeight, this.buttonCanvas, this.buttonCtx, this.touchMap, images['3/4']);
+        this.secondOptionButton.useTransparent = true;
     }
 
     initializeBackground() {
@@ -85,7 +87,7 @@ export class StartScreen {
             else {
                 // Once a button is pressed, render the game
                 this.game.mainLoop();
-                if (this.game.backButton.flag) {
+                if (this.game.backButton.flag && !this.game.saving) {
                     this.started = false;
                     this.game.resetGame();
                     this.game = undefined;
